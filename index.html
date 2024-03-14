@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Chat app using Socket IO and Node JS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .main-container {
+            height: 100vh;
+            width: 100vh;
+        }
+
+        .message-container {
+            width: 100%;
+            background-color: gainsboro;
+            padding: 1em 2em;
+            /* margin-bottom: 10px; */
+            height: 40vh;
+            overflow-y: scroll;
+        }
+
+        /* .message {
+           width: 80%;
+            padding: 8px;
+            border-radius: 8px;
+            word-wrap: break-word;
+        } */
+
+        .own-message {
+            /* float: right;
+            justify-self: end; */
+            text-align: right;
+            margin-bottom: 10px;
+            background-color: #4CAF50;
+            color: white;
+            margin-left: auto;
+            padding: 8px;
+            border-radius: 8px;
+            word-wrap: break-word;
+            width: 48%;
+        }
+
+        .other-message {
+            /* float: left; */
+            text-align: left;
+            width: 48%;
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 8px;
+            word-wrap: break-word;
+            /* justify-self: start; */
+            background-color: greenyellow;
+            color: black;
+            margin-right: auto;
+        }
+
+        .typing-indicator::after {
+            content: '...';
+            /* background-color: red; */
+            animation: typing 1s infinite;
+        }
+
+        /* .typing-indicator {
+            background-color: red;
+        } */
+
+        @keyframes typing {
+            0% {
+                opacity: 0.5;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.5;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="p-6 main-containe">
+        <h1 class="font-bold text-green-500 text-3xl text-center mt-5">Chat Application</h1>
+        <div>
+            <h2 class="font-semibold text-xl text-center mt-5" id="logo">Chat App using Socket io</h2>
+        </div>
+        <!-- <form class="flex flex-col justify-center items-center mt-5" id="form">
+        <input class="border border-gray-400 rounded-md mt-5 p-1" type="text" placeholder="Name" id="myname">
+        <input class="border border-gray-400 rounded-md mt-5 p-1" type="text" placeholder="Message" id="message">
+        <button class="bg-blue-500 rounded-md p-2 text-white mt-5">Send</button>
+    </form> -->
+        <form class="flex flex-col justify-center items-center mt-5" action="" id="login" hidden="true">
+            <input class="border border-gray-400 rounded-md mt-5 p-1" type="text" placeholder="Name" id="myname">
+            <input class="border border-gray-400 rounded-md mt-5 p-1" type="text" placeholder="your id" id="userId">
+            <button class="bg-blue-500 rounded-md p-2 text-white mt-5">Login for chat</button>
+        </form>
+        <!-- <div><button class="bg-blue-500 rounded-md p-2 text-white mt-5" id="login">Login for chat</button></div> -->
+
+        <div class=" d-flex flex-col container-mess">
+            <div class="message-container mt-5" id="messageArea"></div>
+            <form class="flex flex-col  justify-end items-end" action="" id="send">
+                <input class="border border-gray-400 rounded-md mt-5 w-96 p-1" type="text" placeholder="Message"
+                    id="message">
+                <button class="bg-blue-500 w-28 rounded-md p-2 text-white mt-5">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket = io();
+        let container = document.getElementsByClassName('container-mess')[0];
+        let form = document.getElementById('form');
+        let send = document.getElementById('send');
+        let login = document.getElementById('login');
+        let myname = document.getElementById('myname');
+        let message = document.getElementById('message');
+        let messageArea = document.getElementById("messageArea");
+        let id = document.getElementById("userId");
+        // messageArea.style.display='none';
+        container.style.display = 'none';
+
+        let isTyping = false;
+        // Check if user ID exists in local storage, if not generate and store it
+        // let  userId = generateUserId(myname.value);
+        // let userId = localStorage.getItem('userId');
+        let userInformation;
+        login.addEventListener("submit", (e) => {
+            e.preventDefault();
+
+            if (myname.value && id.value) {
+                generateUserId(myname.value, id.value);
+                userInformation = getUserInfo();
+                if (userInformation) {
+                    login.style.display = 'none';
+                    // messageArea.style.display='block';
+                    container.style.display = 'block';
+
+                }
+                // login.style.display = 'block';
+
+            }
+        });
+        message.addEventListener('input', function (event) {
+
+            const inputValue = event.target.value;
+            socket.emit("sendTyping", { userId: userInformation.id, input: inputValue });
+            // console.log('Input changed:', inputValue);
+
+        });
+
+        console.log("data", userInformation);
+
+
+        // form.addEventListener("submit", (e) => {
+        //     e.preventDefault();
+
+        //     if (message.value) {
+        //         socket.emit('send message', { userId: userId, message: message.value });
+        //         message.value = "";
+        //     }
+        // });
+        send.addEventListener("submit", (e) => {
+            e.preventDefault();
+
+            if (message.value) {
+                socket.emit('send message', { userId: userInformation.id, message: message.value });
+                message.value = "";
+            }
+        });
+        socket.on("send name", (username) => {
+            let name = document.createElement("p");
+            name.style.backgroundColor = "grey";
+            name.style.padding = "5px";
+            name.style.width = "auto";
+            name.style.textAlign = "center";
+            name.style.color = "white";
+
+            name.textContent = username + ":";
+            messageArea.appendChild(name);
+        });
+        socket.on("typing", (data) => {
+            if (data.input) {
+                isTyping=true;
+                updateTypingIndicator(data.userId, data.input);
+            }else{
+                isTyping=false;
+            }
+
+            // console.log(isTyping)
+
+        });
+
+
+
+        socket.on("send message", (data) => {
+            displayMessage(data);
+        });
+
+        function displayMessage(data) {
+
+            let messageElement = document.createElement("div");
+            // messageElement.classList.add("message");
+            messageElement.textContent = data.message;
+            // messageContainer.appendChild(messageElement);
+            if (data.userId == id.value) {
+                messageElement.classList.add("own-message");
+            } else {
+                messageElement.classList.add("other-message");
+            }
+            //         if (isTyping && data.userId !== id.value) {
+            //     messageElement.classList.add("typing-indicator");
+            // }
+            messageArea.appendChild(messageElement);
+        }
+
+        function updateTypingIndicator(userId, data) {
+            const typingIndicatorElement = document.createElement("div");
+            if (userId !== id.value) {
+
+                if (isTyping) {
+                    typingIndicatorElement.textContent = "Typing...";
+                    // typingIndicatorElement.classList.add("typing-indicator");
+                    messageArea.appendChild(typingIndicatorElement);
+                }
+                else {
+                    messageArea.removeChild(typingIndicatorElement);
+
+                }
+            } else {
+                messageArea.removeChild(typingIndicatorElement);
+
+            }
+
+
+        }
+        //         function updateTypingIndicator(data) {
+        //     const typingIndicatorElement = document.querySelector(".typing-indicator");
+
+        //     if (data) {
+        //         if (!typingIndicatorElement) {
+        //             const typingIndicatorElement = document.createElement("div");
+        //             typingIndicatorElement.textContent = "Typing...";
+        //             typingIndicatorElement.classList.add("typing-indicator");
+        //             messageArea.appendChild(typingIndicatorElement);
+        //         }
+        //     } else {
+        //         if (typingIndicatorElement && typingIndicatorElement.parentNode === messageArea) {
+        //             messageArea.removeChild(typingIndicatorElement);
+        //         }
+        //     }
+        // }
+
+
+        // Function to generate user ID based on name
+        function generateUserId(name, id) {
+
+            const userInfo = { id: id, userName: name };
+            localStorage.setItem('userInfo', JSON.stringify(userInfo));
+
+
+        }
+        function getUserInfo() {
+            const userInfoString = localStorage.getItem('userInfo');
+            if (userInfoString) {
+                return JSON.parse(userInfoString);
+            } else {
+                return null;
+            }
+        }
+    </script>
+</body>
+
+</html>
