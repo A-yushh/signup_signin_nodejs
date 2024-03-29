@@ -19,7 +19,7 @@ app.use(cookieParser());
 connectDb();
 app.get('/', (req, res) => {
   
-  res.send('Hello, Express!');
+  res.send('Hello, Express! project is running');
 });
 
 app.get('/chat', (req, res) => { 
